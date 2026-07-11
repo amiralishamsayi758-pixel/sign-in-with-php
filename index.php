@@ -1,3 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+$errors = isset($errors) && is_array($errors) ? $errors : [];
+$old = isset($old) && is_array($old) ? $old : [];
+$old = array_merge(['gmail' => '', 'phone' => '', 'username' => ''], $old);
+$savedSuccessfully = ($_GET['status'] ?? '') === 'saved';
+
+function e(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
@@ -224,7 +239,19 @@
                         </div>
                     </header>
 
-                    <form id="signupForm" action="#" method="post" novalidate class="space-y-5 lg:space-y-6 xl:space-y-7">
+                    <?php if ($savedSuccessfully): ?>
+                        <div class="mb-6 rounded-md border border-emerald-500/30 bg-emerald-50/75 px-4 py-3 text-sm leading-7 text-emerald-800 shadow-sm backdrop-blur-md dark:border-emerald-400/25 dark:bg-emerald-400/[0.08] dark:text-emerald-200" role="status" aria-live="polite">
+                            اطلاعات با موفقیت ذخیره شد. کد تأیید جدید نیز با امنیت کامل ایجاد شد.
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (isset($errors['general'])): ?>
+                        <div class="mb-6 rounded-md border border-rose-500/35 bg-rose-50/80 px-4 py-3 text-sm leading-7 text-rose-800 shadow-sm backdrop-blur-md dark:border-rose-400/30 dark:bg-rose-500/[0.09] dark:text-rose-200" role="alert">
+                            <?= e($errors['general']) ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <form id="signupForm" action="process.php" method="post" novalidate class="space-y-5 lg:space-y-6 xl:space-y-7">
                         <div>
                             <label for="gmail" class="mb-2 block text-sm font-semibold text-slate-700 transition-colors duration-[400ms] dark:text-slate-300 lg:mb-2.5 lg:text-[0.95rem]">آدرس جیمیل</label>
                             <div class="relative">
@@ -241,11 +268,13 @@
                                     pattern="^[a-zA-Z0-9.!#$%&amp;'*+/=?^_`{|}~-]+@gmail\.com$"
                                     placeholder="example@gmail.com"
                                     aria-describedby="gmailMessage"
-                                    class="field-input"
+                                    value="<?= e((string) $old['gmail']) ?>"
+                                    <?= isset($errors['gmail']) ? 'aria-invalid="true"' : '' ?>
+                                    class="field-input<?= isset($errors['gmail']) ? ' is-invalid' : '' ?>"
                                 >
                                 <span class="status-icon pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2" aria-hidden="true"></span>
                             </div>
-                            <p id="gmailMessage" class="field-message">آدرس باید به gmail.com@ ختم شود.</p>
+                            <p id="gmailMessage" class="field-message<?= isset($errors['gmail']) ? ' text-rose-700 dark:text-rose-300' : '' ?>"><?= isset($errors['gmail']) ? e($errors['gmail']) : 'آدرس باید به @gmail.com ختم شود.' ?></p>
                         </div>
 
                         <div>
@@ -266,11 +295,13 @@
                                     maxlength="11"
                                     placeholder="09123456789"
                                     aria-describedby="phoneMessage"
-                                    class="field-input"
+                                    value="<?= e((string) $old['phone']) ?>"
+                                    <?= isset($errors['phone']) ? 'aria-invalid="true"' : '' ?>
+                                    class="field-input<?= isset($errors['phone']) ? ' is-invalid' : '' ?>"
                                 >
                                 <span class="status-icon pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2" aria-hidden="true"></span>
                             </div>
-                            <p id="phoneMessage" class="field-message">۱۱ رقم و با 09 شروع شود.</p>
+                            <p id="phoneMessage" class="field-message<?= isset($errors['phone']) ? ' text-rose-700 dark:text-rose-300' : '' ?>"><?= isset($errors['phone']) ? e($errors['phone']) : '۱۱ رقم و با 09 شروع شود.' ?></p>
                         </div>
 
                         <div>
@@ -289,11 +320,13 @@
                                     maxlength="10"
                                     placeholder="۵ تا ۱۰ کاراکتر"
                                     aria-describedby="usernameMessage"
-                                    class="field-input"
+                                    value="<?= e((string) $old['username']) ?>"
+                                    <?= isset($errors['username']) ? 'aria-invalid="true"' : '' ?>
+                                    class="field-input<?= isset($errors['username']) ? ' is-invalid' : '' ?>"
                                 >
                                 <span class="status-icon pointer-events-none absolute right-3.5 top-1/2 hidden -translate-y-1/2" aria-hidden="true"></span>
                             </div>
-                            <p id="usernameMessage" class="field-message">نام کاربری باید بین ۵ تا ۱۰ کاراکتر باشد.</p>
+                            <p id="usernameMessage" class="field-message<?= isset($errors['username']) ? ' text-rose-700 dark:text-rose-300' : '' ?>"><?= isset($errors['username']) ? e($errors['username']) : 'نام کاربری باید بین ۵ تا ۱۰ کاراکتر باشد.' ?></p>
                         </div>
 
                         <button
@@ -432,10 +465,10 @@
         });
 
         form.addEventListener('submit', (event) => {
-            event.preventDefault();
             Object.values(fields).forEach((field) => setFieldState(field, true));
 
             if (!form.checkValidity()) {
+                event.preventDefault();
                 form.querySelector(':invalid').focus();
             }
         });
