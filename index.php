@@ -5,7 +5,7 @@ declare(strict_types=1);
 $errors = isset($errors) && is_array($errors) ? $errors : [];
 $old = isset($old) && is_array($old) ? $old : [];
 $old = array_merge(['gmail' => '', 'phone' => '', 'username' => ''], $old);
-$savedSuccessfully = ($_GET['status'] ?? '') === 'saved';
+$codePreparedSuccessfully = ($_GET['status'] ?? '') === 'prepared';
 
 function e(string $value): string
 {
@@ -239,9 +239,9 @@ function e(string $value): string
                         </div>
                     </header>
 
-                    <?php if ($savedSuccessfully): ?>
+                    <?php if ($codePreparedSuccessfully): ?>
                         <div class="mb-6 rounded-md border border-emerald-500/30 bg-emerald-50/75 px-4 py-3 text-sm leading-7 text-emerald-800 shadow-sm backdrop-blur-md dark:border-emerald-400/25 dark:bg-emerald-400/[0.08] dark:text-emerald-200" role="status" aria-live="polite">
-                            اطلاعات با موفقیت ذخیره شد. کد تأیید جدید نیز با امنیت کامل ایجاد شد.
+                            اطلاعات معتبر است و کد تأیید جدید با اعتبار دو دقیقه ایجاد شد.
                         </div>
                     <?php endif; ?>
 

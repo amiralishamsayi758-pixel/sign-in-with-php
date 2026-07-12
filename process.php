@@ -14,6 +14,16 @@ function postedString(string $key): string
     return is_string($value) ? trim($value) : '';
 }
 
+function generateVerificationCode(): string
+{
+    return (string) random_int(1000, 9999);
+}
+
+function createExpirationTime(DateTimeImmutable $createdAt): DateTimeImmutable
+{
+    return $createdAt->modify('+2 minutes');
+}
+
 $old = [
     'gmail' => postedString('gmail'),
     'phone' => postedString('phone'),
@@ -51,37 +61,32 @@ if ($errors !== []) {
     exit;
 }
 
-$verificationCode = (string) random_int(1000, 9999);
+$gmail = $old['gmail'];
+$phone = $old['phone'];
+$username = $old['username'];
 
-try {
-    /** @var PDO $pdo */
-    $pdo = require __DIR__ . '/config/database.php';
+$timezone = new DateTimeZone('UTC');
+$now = new DateTimeImmutable('now', $timezone);
 
-    $statement = $pdo->prepare(
-        'INSERT INTO users (gmail, phone, username, verification_code)
-         VALUES (:gmail, :phone, :username, :verification_code)
-         ON DUPLICATE KEY UPDATE
-            gmail = :updated_gmail,
-            username = :updated_username,
-            verification_code = :updated_verification_code,
-            updated_at = CURRENT_TIMESTAMP'
-    );
+$verificationCode = generateVerificationCode();
+$codeCreatedAt = $now->format('Y-m-d H:i:s');
+$codeExpiresAt = createExpirationTime($now)->format('Y-m-d H:i:s');
+$updatedAt = $codeCreatedAt;
 
-    $statement->execute([
-        'gmail' => $old['gmail'],
-        'phone' => $old['phone'],
-        'username' => $old['username'],
-        'verification_code' => $verificationCode,
-        'updated_gmail' => $old['gmail'],
-        'updated_username' => $old['username'],
-        'updated_verification_code' => $verificationCode,
-    ]);
-} catch (Throwable $exception) {
-    $errors['general'] = 'ذخیره اطلاعات انجام نشد. لطفاً اتصال پایگاه داده را بررسی و دوباره تلاش کنید.';
-    http_response_code(500);
-    require __DIR__ . '/index.php';
-    exit;
-}
+// Future database lookup by phone number using $phone.
+//
+// If the phone number is new:
+// Future INSERT using $gmail, $phone, $username, $verificationCode,
+// $codeCreatedAt, $codeExpiresAt, and $updatedAt.
+//
+// If the phone number already exists:
+// Future UPDATE using $gmail, $username, $verificationCode,
+// $codeExpiresAt, and $updatedAt while keeping created_at unchanged.
+// Replacing verification_code and code_expires_at will make the old code unusable.
+//
+// Future verification rule:
+// The stored code is valid while the current UTC time is earlier than code_expires_at.
+// It is expired when the current UTC time is equal to or later than code_expires_at.
 
-header('Location: index.php?status=saved', true, 303);
+header('Location: index.php?status=prepared', true, 303);
 exit;
