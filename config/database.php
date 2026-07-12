@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-$host = getenv('DB_HOST') ?: '127.0.0.1';
-$port = getenv('DB_PORT') ?: '3306';
-$database = getenv('DB_NAME') ?: 'auth_project';
-$username = getenv('DB_USER') ?: 'root';
-$password = getenv('DB_PASS') ?: '';
+$dbHost = getenv('DB_HOST') ?: '127.0.0.1';
+$dbPort = getenv('DB_PORT') ?: '3307';
+$dbName = getenv('DB_NAME') ?: 'sign_in_system';
+$dbUsername = getenv('DB_USER') ?: 'root';
+$dbPassword = getenv('DB_PASS') ?: 'Bouggy!4546';
 
-$dsn = "mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4";
+$dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
 
 return new PDO(
-    $dsn,
-    $username,
-    $password,
+    $dbDsn,
+    $dbUsername,
+    $dbPassword,
     [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

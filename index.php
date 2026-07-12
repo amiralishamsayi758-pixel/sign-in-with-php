@@ -5,7 +5,13 @@ declare(strict_types=1);
 $errors = isset($errors) && is_array($errors) ? $errors : [];
 $old = isset($old) && is_array($old) ? $old : [];
 $old = array_merge(['gmail' => '', 'phone' => '', 'username' => ''], $old);
-$codePreparedSuccessfully = ($_GET['status'] ?? '') === 'prepared';
+$rawStatus = $_GET['status'] ?? '';
+$status = is_string($rawStatus) ? $rawStatus : '';
+$statusMessages = [
+    'success' => 'اطلاعات با موفقیت ثبت شد و کد تأیید جدید ایجاد شد.',
+    'database-error' => 'در ثبت اطلاعات مشکلی رخ داد. لطفاً دوباره تلاش کنید.',
+];
+$statusMessage = $statusMessages[$status] ?? null;
 
 function e(string $value): string
 {
@@ -239,9 +245,15 @@ function e(string $value): string
                         </div>
                     </header>
 
-                    <?php if ($codePreparedSuccessfully): ?>
-                        <div class="mb-6 rounded-md border border-emerald-500/30 bg-emerald-50/75 px-4 py-3 text-sm leading-7 text-emerald-800 shadow-sm backdrop-blur-md dark:border-emerald-400/25 dark:bg-emerald-400/[0.08] dark:text-emerald-200" role="status" aria-live="polite">
-                            اطلاعات معتبر است و کد تأیید جدید با اعتبار دو دقیقه ایجاد شد.
+                    <?php if ($status === 'success' && $statusMessage !== null): ?>
+                        <div class="mb-6 flex items-start gap-3 rounded-md border border-emerald-500/30 bg-emerald-50/75 px-4 py-3 text-sm leading-7 text-emerald-800 shadow-sm backdrop-blur-md dark:border-emerald-400/25 dark:bg-emerald-400/[0.08] dark:text-emerald-200" role="status" aria-live="polite">
+                            <svg class="mt-1 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg>
+                            <span><?= e($statusMessage) ?></span>
+                        </div>
+                    <?php elseif ($status === 'database-error' && $statusMessage !== null): ?>
+                        <div class="mb-6 flex items-start gap-3 rounded-md border border-rose-500/35 bg-rose-50/80 px-4 py-3 text-sm leading-7 text-rose-800 shadow-sm backdrop-blur-md dark:border-rose-400/30 dark:bg-rose-500/[0.09] dark:text-rose-200" role="alert">
+                            <svg class="mt-1 h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/></svg>
+                            <span><?= e($statusMessage) ?></span>
                         </div>
                     <?php endif; ?>
 

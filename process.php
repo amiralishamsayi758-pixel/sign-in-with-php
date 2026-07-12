@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/verification-helpers.php';
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: index.php', true, 303);
     exit;
@@ -12,16 +14,6 @@ function postedString(string $key): string
     $value = $_POST[$key] ?? '';
 
     return is_string($value) ? trim($value) : '';
-}
-
-function generateVerificationCode(): string
-{
-    return (string) random_int(1000, 9999);
-}
-
-function createExpirationTime(DateTimeImmutable $createdAt): DateTimeImmutable
-{
-    return $createdAt->modify('+2 minutes');
 }
 
 $old = [
@@ -73,20 +65,100 @@ $codeCreatedAt = $now->format('Y-m-d H:i:s');
 $codeExpiresAt = createExpirationTime($now)->format('Y-m-d H:i:s');
 $updatedAt = $codeCreatedAt;
 
-// Future database lookup by phone number using $phone.
-//
-// If the phone number is new:
-// Future INSERT using $gmail, $phone, $username, $verificationCode,
-// $codeCreatedAt, $codeExpiresAt, and $updatedAt.
-//
-// If the phone number already exists:
-// Future UPDATE using $gmail, $username, $verificationCode,
-// $codeExpiresAt, and $updatedAt while keeping created_at unchanged.
-// Replacing verification_code and code_expires_at will make the old code unusable.
-//
-// Future verification rule:
-// The stored code is valid while the current UTC time is earlier than code_expires_at.
-// It is expired when the current UTC time is equal to or later than code_expires_at.
+$pdo = null;
+$resendLimitReached = false;
 
-header('Location: index.php?status=prepared', true, 303);
-exit;
+try {
+    /** @var PDO $pdo */
+    $pdo = require __DIR__ . '/config/database.php';
+    $pdo->beginTransaction();
+
+    $selectStatement = $pdo->prepare(
+        'SELECT id, resend_count
+         FROM users
+         WHERE phone = :phone
+         LIMIT 1
+         FOR UPDATE'
+    );
+    $selectStatement->execute(['phone' => $phone]);
+    $existingUser = $selectStatement->fetch();
+
+    if ($existingUser === false) {
+        $insertStatement = $pdo->prepare(
+            'INSERT INTO users (
+                gmail,
+                phone,
+                username,
+                verification_code,
+                code_expires_at,
+                resend_count,
+                is_verified,
+                created_at,
+                updated_at
+             ) VALUES (
+                :gmail,
+                :phone,
+                :username,
+                :verification_code,
+                :code_expires_at,
+                0,
+                0,
+                :created_at,
+                :updated_at
+             )'
+        );
+        $insertStatement->execute([
+            'gmail' => $gmail,
+            'phone' => $phone,
+            'username' => $username,
+            'verification_code' => $verificationCode,
+            'code_expires_at' => $codeExpiresAt,
+            'created_at' => $codeCreatedAt,
+            'updated_at' => $updatedAt,
+        ]);
+    } elseif ((int) $existingUser['resend_count'] >= MAX_RESEND_ATTEMPTS) {
+        $resendLimitReached = true;
+    } else {
+        $updateStatement = $pdo->prepare(
+            'UPDATE users
+             SET gmail = :gmail,
+                 username = :username,
+                 verification_code = :verification_code,
+                 code_expires_at = :code_expires_at,
+                 resend_count = resend_count + 1,
+                 is_verified = 0,
+                 updated_at = :updated_at
+             WHERE id = :id'
+        );
+        $updateStatement->execute([
+            'gmail' => $gmail,
+            'username' => $username,
+            'verification_code' => $verificationCode,
+            'code_expires_at' => $codeExpiresAt,
+            'updated_at' => $updatedAt,
+            'id' => (int) $existingUser['id'],
+        ]);
+    }
+
+    $pdo->commit();
+} catch (Throwable $exception) {
+    if ($pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    header('Location: index.php?status=database-error', true, 303);
+    exit;
+}
+
+startVerificationSession();
+session_regenerate_id(true);
+storeVerificationPhone($phone);
+
+if ($resendLimitReached) {
+    setVerificationFlash(
+        'error',
+        'تعداد دفعات مجاز ارسال مجدد به پایان رسیده است.'
+    );
+}
+
+redirectTo('verify.php');
