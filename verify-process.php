@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/verification-helpers.php';
+require_once __DIR__ . '/auth/check-auth.php';
 
 startVerificationSession();
 
@@ -21,19 +21,8 @@ if (!validVerificationCsrfToken($_POST['csrf_token'] ?? null)) {
     redirectTo('verify.php');
 }
 
-$submittedDigits = $_POST['code'] ?? null;
-$submittedCode = '';
-
-if (is_array($submittedDigits) && count($submittedDigits) === 4) {
-    foreach ($submittedDigits as $digit) {
-        if (!is_string($digit) || preg_match('/\A[0-9]\z/D', $digit) !== 1) {
-            $submittedCode = '';
-            break;
-        }
-
-        $submittedCode .= $digit;
-    }
-}
+$submittedValue = $_POST['verification_code'] ?? '';
+$submittedCode = is_string($submittedValue) ? $submittedValue : '';
 
 if (preg_match('/\A[0-9]{4}\z/D', $submittedCode) !== 1) {
     setVerificationFlash('error', 'کد تأیید باید دقیقاً چهار رقم باشد.');
@@ -48,7 +37,8 @@ try {
     $pdo->beginTransaction();
 
     $selectStatement = $pdo->prepare(
-        'SELECT id, phone, verification_code, code_expires_at, is_verified, resend_count
+        'SELECT id, gmail, phone, username, verification_code,
+                code_expires_at, is_verified
          FROM users
          WHERE phone = :phone
          LIMIT 1
@@ -61,12 +51,6 @@ try {
         $pdo->rollBack();
         unset($_SESSION[VERIFICATION_PHONE_SESSION_KEY]);
         redirectTo('index.php');
-    }
-
-    if ((int) $user['is_verified'] === 1) {
-        $pdo->commit();
-        setVerificationFlash('success', 'حساب کاربری شما قبلاً تأیید شده است.');
-        redirectTo('verify.php');
     }
 
     $expiresAt = databaseUtcDateTime((string) $user['code_expires_at']);
@@ -84,20 +68,34 @@ try {
         redirectTo('verify.php');
     }
 
+    $authenticationToken = createAuthenticationToken($now);
     $updateStatement = $pdo->prepare(
         'UPDATE users
          SET is_verified = 1,
+             resend_count = 0,
+             auth_token_hash = :auth_token_hash,
+             token_expires_at = :token_expires_at,
+             last_authenticated_at = :last_authenticated_at,
              updated_at = :updated_at
          WHERE id = :id'
     );
     $updateStatement->execute([
+        'auth_token_hash' => $authenticationToken['hash'],
+        'token_expires_at' => $authenticationToken['expires_at']->format('Y-m-d H:i:s'),
+        'last_authenticated_at' => $now->format('Y-m-d H:i:s'),
         'updated_at' => $now->format('Y-m-d H:i:s'),
         'id' => (int) $user['id'],
     ]);
 
     $pdo->commit();
     session_regenerate_id(true);
-    setVerificationFlash('success', 'حساب کاربری شما با موفقیت تأیید شد.');
+    unset(
+        $_SESSION[VERIFICATION_PHONE_SESSION_KEY],
+        $_SESSION[VERIFICATION_CSRF_SESSION_KEY]
+    );
+    setAuthenticationCookie($authenticationToken['raw'], $authenticationToken['expires_at']);
+    setAuthenticationFlash('حساب کاربری شما با موفقیت تأیید شد.');
+    redirectTo('dashboard.php');
 } catch (Throwable $exception) {
     if ($pdo instanceof PDO && $pdo->inTransaction()) {
         $pdo->rollBack();

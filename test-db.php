@@ -7,8 +7,6 @@ try {
 
     echo 'اتصال به دیتابیس با موفقیت انجام شد.';
 } catch (Throwable $error) {
-    echo '<pre>';
-    echo 'نوع خطا: ' . get_class($error) . PHP_EOL;
-    echo 'پیام خطا: ' . $error->getMessage();
-    echo '</pre>';
+    http_response_code(500);
+    echo 'اتصال به پایگاه داده انجام نشد.';
 }

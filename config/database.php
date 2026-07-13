@@ -10,7 +10,7 @@ $dbPassword = getenv('DB_PASS') ?: 'Bouggy!4546';
 
 $dbDsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
 
-return new PDO(
+$pdo = new PDO(
     $dbDsn,
     $dbUsername,
     $dbPassword,
@@ -20,3 +20,7 @@ return new PDO(
         PDO::ATTR_EMULATE_PREPARES => false,
     ]
 );
+
+$pdo->exec("SET time_zone = '+00:00'");
+
+return $pdo;

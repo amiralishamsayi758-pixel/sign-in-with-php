@@ -24,7 +24,7 @@ try {
     /** @var PDO $pdo */
     $pdo = require __DIR__ . '/config/database.php';
     $statement = $pdo->prepare(
-        'SELECT id, code_expires_at, is_verified, resend_count
+        'SELECT id, code_expires_at, resend_count
          FROM users
          WHERE phone = :phone
          LIMIT 1'
@@ -40,7 +40,6 @@ if ($pageError === null && $user === false) {
     redirectTo('index.php');
 }
 
-$isVerified = is_array($user) && (int) $user['is_verified'] === 1;
 $resendCount = is_array($user) ? (int) $user['resend_count'] : 0;
 $resendLimitReached = $resendCount >= MAX_RESEND_ATTEMPTS;
 $expiresAt = is_array($user)
@@ -173,11 +172,6 @@ $flash = pullVerificationFlash();
 
                     <?php if ($pageError !== null): ?>
                         <div class="rounded-md border border-rose-500/35 bg-rose-50/80 px-4 py-3 text-sm leading-7 text-rose-800 dark:border-rose-400/30 dark:bg-rose-500/[0.09] dark:text-rose-200" role="alert"><?= verificationEscape($pageError) ?></div>
-                    <?php elseif ($isVerified): ?>
-                        <div class="rounded-md border border-emerald-500/30 bg-emerald-50/75 px-5 py-5 text-center text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-400/[0.08] dark:text-emerald-200" role="status">
-                            <svg class="mx-auto mb-3 h-9 w-9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg>
-                            <p class="font-bold">حساب کاربری شما با موفقیت تأیید شد.</p>
-                        </div>
                     <?php else: ?>
                         <div class="mb-6 flex items-center justify-between rounded-md border border-teal-500/15 bg-teal-50/55 px-4 py-3 dark:border-teal-300/10 dark:bg-teal-300/[0.05]">
                             <span class="text-sm text-slate-600 dark:text-slate-400">زمان باقی‌مانده</span>
@@ -188,11 +182,12 @@ $flash = pullVerificationFlash();
 
                         <form id="verificationForm" action="verify-process.php" method="post" class="space-y-6">
                             <input type="hidden" name="csrf_token" value="<?= verificationEscape($csrfToken) ?>">
+                            <input id="verificationCode" type="hidden" name="verification_code" value="">
                             <fieldset>
                                 <legend class="sr-only">چهار رقم کد تأیید</legend>
                                 <div id="codeInputs" class="flex justify-center gap-2.5 sm:gap-4" dir="ltr">
                                     <?php for ($digit = 1; $digit <= 4; $digit++): ?>
-                                        <input class="code-input" type="text" name="code[]" maxlength="1" inputmode="numeric" pattern="[0-9]" <?= $digit === 1 ? 'autocomplete="one-time-code" autofocus' : 'autocomplete="off"' ?> aria-label="رقم <?= $digit ?> کد تأیید" required <?= $isExpired ? 'disabled' : '' ?>>
+                                        <input class="code-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" <?= $digit === 1 ? 'autocomplete="one-time-code" autofocus' : 'autocomplete="off"' ?> aria-label="رقم <?= $digit ?> کد تأیید" required <?= $isExpired ? 'disabled' : '' ?>>
                                     <?php endfor; ?>
                                 </div>
                             </fieldset>
@@ -239,6 +234,7 @@ $flash = pullVerificationFlash();
         const resendButton = document.getElementById('resendButton');
         const expirationMessage = document.getElementById('expirationMessage');
         const verificationForm = document.getElementById('verificationForm');
+        const verificationCode = document.getElementById('verificationCode');
         const digitInputs = Array.from(document.querySelectorAll('.code-input'));
 
         if (countdown && verifyButton && resendButton && expirationMessage && verificationForm) {
@@ -273,6 +269,7 @@ $flash = pullVerificationFlash();
             digitInputs.forEach((input, index) => {
                 input.addEventListener('input', () => {
                     input.value = input.value.replace(/\D/g, '').slice(-1);
+                    verificationCode.value = digitInputs.map((digitInput) => digitInput.value).join('');
                     if (input.value && digitInputs[index + 1]) digitInputs[index + 1].focus();
                 });
                 input.addEventListener('keydown', (event) => {
@@ -287,11 +284,13 @@ $flash = pullVerificationFlash();
                     pasted.split('').forEach((digit, digitIndex) => {
                         if (digitInputs[digitIndex]) digitInputs[digitIndex].value = digit;
                     });
+                    verificationCode.value = digitInputs.map((digitInput) => digitInput.value).join('');
                     digitInputs[Math.min(pasted.length, 4) - 1].focus();
                 });
             });
 
             verificationForm.addEventListener('submit', (event) => {
+                verificationCode.value = digitInputs.map((input) => input.value).join('');
                 if (Date.now() >= endTime || digitInputs.some((input) => !/^[0-9]$/.test(input.value))) {
                     event.preventDefault();
                     if (Date.now() >= endTime) expireInterface();

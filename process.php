@@ -126,7 +126,6 @@ try {
                  verification_code = :verification_code,
                  code_expires_at = :code_expires_at,
                  resend_count = resend_count + 1,
-                 is_verified = 0,
                  updated_at = :updated_at
              WHERE id = :id'
         );

@@ -29,7 +29,7 @@ try {
     $pdo->beginTransaction();
 
     $selectStatement = $pdo->prepare(
-        'SELECT id, code_expires_at, is_verified, resend_count
+        'SELECT id, code_expires_at, resend_count
          FROM users
          WHERE phone = :phone
          LIMIT 1
@@ -42,12 +42,6 @@ try {
         $pdo->rollBack();
         unset($_SESSION[VERIFICATION_PHONE_SESSION_KEY]);
         redirectTo('index.php');
-    }
-
-    if ((int) $user['is_verified'] === 1) {
-        $pdo->commit();
-        setVerificationFlash('success', 'حساب کاربری شما قبلاً تأیید شده است.');
-        redirectTo('verify.php');
     }
 
     if ((int) $user['resend_count'] >= MAX_RESEND_ATTEMPTS) {
@@ -73,7 +67,6 @@ try {
          SET verification_code = :verification_code,
              code_expires_at = :code_expires_at,
              resend_count = resend_count + 1,
-             is_verified = 0,
              updated_at = :updated_at
          WHERE id = :id'
     );
